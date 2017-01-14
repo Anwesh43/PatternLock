@@ -2,6 +2,7 @@ package com.anwesome.ui.lockerpattern;
 
 import android.app.Activity;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.graphics.Canvas;
 import android.graphics.Color;
 import android.graphics.Paint;
@@ -24,8 +25,14 @@ public class LockerPattern {
     private boolean saved = false;
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int width=100,height=100;
+    private boolean wrongCode = false;
+    private String sharedPrefFile="";
+    private String lockIndexes = "",newLockIndexes="";
+    private SharedPreferences sharedPreferences;
+    private LockView lockView;
     public LockerPattern(Activity activity) {
         this.activity = activity;
+        sharedPrefFile = activity.getPackageName()+"_"+LPConstants.SHARED_PREF_FILE;
         initDimensions();
     }
     public void initDimensions() {
@@ -39,9 +46,37 @@ public class LockerPattern {
         }
     }
     public void lock() {
-        LockView lockView = new LockView(activity.getApplicationContext());
-        activity.setVisible(false);
+        newLockIndexes="";
+        sharedPreferences = activity.getSharedPreferences(sharedPrefFile,0);
+        saved = sharedPreferences.getBoolean(LPConstants.SAVED_KEY,false);
+        if(saved) {
+            lockIndexes = sharedPreferences.getString(LPConstants.INDEXES_KEY,"");
+        }
+        lockView = new LockView(activity.getApplicationContext());
         activity.addContentView(lockView,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
+    }
+    private void dismiss() {
+        lockView.setVisibility(View.INVISIBLE);
+        lockView = null;
+    }
+    private void unlock() {
+        if(saved) {
+            if(lockIndexes.equals(newLockIndexes)) {
+                dismiss();
+            }
+            else {
+                lockView.reset();
+                wrongCode = true;
+            }
+        }
+        else {
+            SharedPreferences.Editor editor = sharedPreferences.edit();
+            editor.putBoolean(LPConstants.SAVED_KEY,true);
+            editor.putString(LPConstants.INDEXES_KEY,newLockIndexes);
+            editor.commit();
+            dismiss();
+        }
+        newLockIndexes="";
     }
     private class LockView extends View {
         private boolean isDown = false;
@@ -54,6 +89,15 @@ public class LockerPattern {
         public LockView(Context context) {
             super(context);
         }
+        public void reset() {
+            isDown = false;
+            currentNode = null;
+            currentPoint = null;
+            nodes = new ConcurrentLinkedQueue<>();
+            time = 0;
+            lockGraph = new LockGraph();
+            invalidate();
+        }
         public void onDraw(Canvas canvas) {
             canvas.drawColor(Color.parseColor("#66000000"));
             if(time == 0) {
@@ -62,6 +106,17 @@ public class LockerPattern {
                 fillGraph(2*xOffset,2*yOffset);
                 xOffset = canvas.getWidth()/6;
             }
+            paint.setColor(Color.parseColor("#d32f2f"));
+            paint.setStyle(Paint.Style.FILL);
+            paint.setTextSize(canvas.getWidth()/17);
+            String text = LPConstants.SAVED_TEXT;
+            if(saved) {
+                text = LPConstants.UNLOCK_TEXT;
+                if(wrongCode) {
+                    text = LPConstants.WRONG_TEXT;
+                }
+            }
+            canvas.drawText(text,canvas.getWidth()/2-paint.measureText(text)/2,canvas.getHeight()/4,paint);
             canvas.save();
             canvas.translate(xOffset,yOffset);
             for(LockNode lockNode:lockGraph.getAllNodes()) {
@@ -156,6 +211,7 @@ public class LockerPattern {
                     if(isDown && currentNode!=null && currentPoint!=null) {
                         isDown = false;
                         currentPoint = new PointF(currentNode.getX(),currentNode.getY());
+                        unlock();
                     }
                     break;
             }
@@ -172,10 +228,13 @@ public class LockerPattern {
             lockNodes.add(lockNode);
         }
         public LockNode contains(float x,float y) {
+            int index = 0;
             for(LockNode lockNode:lockNodes) {
+                newLockIndexes+=""+index;
                 if(lockNode.contains(x,y)) {
                     return lockNode;
                 }
+                index++;
             }
             return null;
         }
@@ -245,6 +304,9 @@ public class LockerPattern {
         public LockNode neighborContains(LockGraph graph,float x,float y) {
             for(Integer neighborIndex:neighbors)  {
                 if(graph.getNodeAt(neighborIndex).contains(x,y)) {
+                    if(newLockIndexes!="") {
+                        newLockIndexes+=","+neighborIndex;
+                    }
                     return graph.getNodeAt(neighborIndex);
                 }
             }
