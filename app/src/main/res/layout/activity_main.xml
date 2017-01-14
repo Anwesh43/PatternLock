@@ -10,5 +10,14 @@
     android:orientation="vertical"
     tools:context="com.anwesome.ui.lockerpatterdemo.MainActivity">
 
-
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="click1"
+        android:id="@+id/b1"/>
+    <Button
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="click2"
+        android:id="@+id/b2"/>
 </LinearLayout>
