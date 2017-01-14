@@ -21,6 +21,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
  */
 public class LockerPattern {
     private Activity activity;
+    private boolean saved = false;
     private Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
     private int width=100,height=100;
     public LockerPattern(Activity activity) {
@@ -39,9 +40,8 @@ public class LockerPattern {
     }
     public void lock() {
         LockView lockView = new LockView(activity.getApplicationContext());
-        lockView.setY(height/3);
-        lockView.setX(width/8);
-        activity.addContentView(lockView,new ViewGroup.LayoutParams(3*width/4,3*width/4));
+        activity.setVisible(false);
+        activity.addContentView(lockView,new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.MATCH_PARENT));
     }
     private class LockView extends View {
         private boolean isDown = false;
@@ -50,13 +50,20 @@ public class LockerPattern {
         private LockNode currentNode;
         private PointF currentPoint;
         private ConcurrentLinkedQueue<LockNode> nodes = new ConcurrentLinkedQueue<>();
+        private float xOffset=0,yOffset = 0;
         public LockView(Context context) {
             super(context);
         }
         public void onDraw(Canvas canvas) {
+            canvas.drawColor(Color.parseColor("#66000000"));
             if(time == 0) {
-               fillGraph((canvas.getWidth()*2)/3,(canvas.getHeight()*2)/3);
+                xOffset = canvas.getWidth()/3;
+                yOffset = canvas.getHeight()/3;
+                fillGraph(2*xOffset,2*yOffset);
+                xOffset = canvas.getWidth()/6;
             }
+            canvas.save();
+            canvas.translate(xOffset,yOffset);
             for(LockNode lockNode:lockGraph.getAllNodes()) {
                 lockNode.draw(canvas,paint);
             }
@@ -78,9 +85,11 @@ public class LockerPattern {
             if(currentNode!=null && currentPoint!=null) {
                 canvas.drawLine(currentNode.getX(),currentNode.getY(),currentPoint.x,currentPoint.y,paint);
             }
+            canvas.restore();
+            time++;
         }
-        private void fillGraph(int w,int h) {
-            int gap = 2*w/5;
+        private void fillGraph(float w,float h) {
+            float gap = 2*w/5;
             for(int i=0;i<9;i++) {
                 float x = w/10+(i%3)*gap;
                 float y = w/10+(i/3)*gap;
@@ -117,7 +126,7 @@ public class LockerPattern {
             lockNode.addNeighbor(3*currentYIndex+currentXIndex);
         }
         public boolean onTouchEvent(MotionEvent event) {
-            float x = event.getX(),y = event.getY();
+            float x = event.getX()-xOffset,y = event.getY()-yOffset;
             switch (event.getAction()) {
                 case MotionEvent.ACTION_DOWN:
                     if(!isDown && currentNode==null && currentPoint==null) {
